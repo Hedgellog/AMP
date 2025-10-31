@@ -1,0 +1,25 @@
+# arguments for dataset
+dataset: treetest
+nclass: 2
+crop_size: 448 # 518 /448 /322
+aug: True
+data_root: /media/llog/AGMM-SASSdata/testdata/
+mode: 'scribble'
+
+# arguments for training
+epochs: 80
+batch_size: 2
+lr: 0.001  # 4GPUs
+lr_multi: 10.0
+criterion:
+  name: CELoss
+  kwargs:
+    ignore_index: 2
+conf_thresh: 0.95
+
+# arguments for model
+aux: False
+backbone: DINOV2b      #DINOV2(s/b/l/g) DINOV3_(vits16/vits16plus/vitb16/vitl16/vitl16plus/vith16plus/vit7b16) 
+# attn choice: CA or CBAM or SA. (default attn1:CA, attn2:CBAM)
+attn1: CA
+attn2: CBAM
