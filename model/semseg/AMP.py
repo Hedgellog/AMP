@@ -1,10 +1,9 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
-import model.backbone.resnet as resnet
 import model.backbone.dinov2 as dinov2
 import logging
-from model.wavelet.FMS import WT, WF
+from model.wavelet.WT import WT
 from model.muti_branch_cnns import ASPP, Decoder, CBAM, SpatialAttention, ChannelAttention, Decoder_Attention
 
 logger = logging.getLogger()
@@ -115,11 +114,11 @@ class AMP(nn.Module):
         self.decoder2 = Decoder_Attention(cfg['nclass'], 576, norm_fn_for_extra_modules, attention_mode=self.attn2)
 
         # wavelet part 
-        self.wavelet_H = WT(3, self.channels ,num_heads=3,window_size=8)
+        self.wavelet_H = WT(3, self.channels)
 
     def forward(self, x):
         b, _, h, w = x.shape
-        ori_f = self.backbone.base_forward(x) # dinov3
+        ori_f = self.backbone.base_forward(x) # dinov2 & dinov3
         f1, f2, f3, f4 = ori_f[:4]
         _, fre_feat_H = self.wavelet_H(x)
         f1 = F.interpolate(f1,size=fre_feat_H.shape[-2:], mode='bicubic', align_corners=False)
@@ -151,18 +150,7 @@ class AMP(nn.Module):
         x_aux= self.decoder2(pseudo_out, x_low_level)
         x_2 = resize_for_tensors(x_aux, x.size()[2:], align_corners=True) #cnn output2 
 
-        if self.aux:
-            aux_feat, aux_out = self.aux_classifier(f4)
-            aux_out = F.interpolate(aux_out, size=(h, w), mode="bilinear", align_corners=True)
-            if self.training:
-                return aux_feat, aux_out, feat, out
-
-            else:
-                aux_out = F.softmax(aux_out, dim=1)
-                out = F.softmax(out, dim=1)
-                return aux_out * 0.4 + out * 0.6
+        if self.training:
+            return ori_f, after_adapter, feat, x_1, x_2, out
         else:
-            if self.training:
-                return ori_f, after_adapter, feat, x_1, x_2, out
-            else:
-                return out.softmax(1)
+            return out.softmax(1)

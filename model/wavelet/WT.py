@@ -1,0 +1,38 @@
+import torch
+import torch.nn as nn
+from pytorch_wavelets import DWTForward
+
+
+class WT(nn.Module):
+    def __init__(self, in_ch, out_ch):
+        super(WT, self).__init__()
+        self.wt = DWTForward(J=1, mode='zero', wave='haar')
+        self.conv_bn_relu = nn.Sequential(
+                                    nn.Conv2d(in_ch*3, in_ch*3, kernel_size=1, stride=1),
+                                    nn.BatchNorm2d(in_ch*3),
+                                    nn.ReLU(inplace=True),
+                                    )
+        self.outconv_bn_relu_L = nn.Sequential(
+            nn.Conv2d(in_ch, out_ch, kernel_size=1, stride=1),
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(inplace=True),
+        )
+        self.outconv_bn_relu_H = nn.Sequential(
+            nn.Conv2d(3*in_ch, out_ch, kernel_size=1, stride=1),
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(inplace=True),
+        )
+    def forward(self, x):
+
+        yL, yH = self.wt(x)
+        y_HL = yH[0][:,:,0,::]
+        y_LH = yH[0][:,:,1,::]
+        y_HH = yH[0][:,:,2,::]
+
+        yH = torch.cat([y_HL, y_LH, y_HH], dim=1)
+        yH = self.conv_bn_relu(yH)
+
+        yL = self.outconv_bn_relu_L(yL)
+        yH = self.outconv_bn_relu_H(yH)
+
+        return yL, yH

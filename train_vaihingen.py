@@ -46,7 +46,6 @@ def choose_vis_channels(raw_features):
     return pca_feat
 
 
-
 def main():
     args = parser.parse_args()
     cfg = yaml.load(open(args.config, "r"), Loader=yaml.Loader)     
@@ -90,6 +89,10 @@ def main():
     total_iters = len(trainloader) * cfg['epochs']
     previous_best = 0.0
     global_step = 0
+
+    # hyperparameters
+    beta1 = 0.5
+    beta2 = 1/3
 
     # (Initialize logging)
     experiment = wandb.init(project='Dinov2withWTconv', resume='allow', anonymous='must')
@@ -135,9 +138,9 @@ def main():
                 ave_output = (outputs1+outputs2)/2
                 loss_kl1 = kd_loss(outputs1,ave_output.detach())
                 loss_kl2 = kd_loss(outputs2,ave_output.detach())
-                
-                loss_seg = (loss_ce1 + loss_ce2 + loss_ce3)/3
+                loss_pl = (loss_ce1 + loss_ce2) * beta2
                 loss_kl = (loss_kl1 + loss_kl2)/2
+                loss_seg = loss_ce3 * beta1 + cls_loss
 
             else:                
                 outputs1_par = par(img,outputs1)
@@ -153,9 +156,9 @@ def main():
                 loss_ce2 = loss_calc(outputs2,mask,ignore_index=cfg['nclass'], multi=False,
                                  class_weight=use_weight, ohem=ohem)
                 loss_ce3 = structure_loss(pred,merged_labels,cfg['nclass'])#
-
-                loss_seg = (loss_ce1 + loss_ce2 + loss_ce3)/3   
+                loss_pl = (loss_ce1 + loss_ce2) * beta2
                 loss_kl = (loss_kl1 + loss_kl2)/2
+                loss_seg = loss_ce3 * beta1 + cls_loss
 
              # total loss
             loss = loss_seg + gmm_loss + loss_kl + loss_pl
